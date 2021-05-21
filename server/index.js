@@ -1,16 +1,26 @@
 const express = require('express');
+const path = require('path');
 const app = express();
+var cors = require('cors')
+
 app.use(express.json());
+app.use(express.static('public'))
+app.use(cors());
 const port = 3000;
 
+let argonValues = {};
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-  console.log("got request at /");
-})
+app.get('/', function(req, res) {
+  res.sendFile(path.join(__dirname, '/public/index.html'));
+});
+
+app.get('/argonValues', (req,res) => {
+  res.send(argonValues);
+});
 
 app.post('/json', (req, res) => {
   console.log("received req " , req.body);
+  argonValues = { ...argonValues, ...req.body };
   res.send(req.body);
 });
 
