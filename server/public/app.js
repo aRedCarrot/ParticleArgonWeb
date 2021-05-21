@@ -23,3 +23,26 @@ let updateUI = setInterval(() => {
     document.getElementById('init').innerText = 'No argon values found';
   }
 }, 1000);
+
+function initMap() {
+  fetch(serverURL+"/argonLocation").then(response => response.json()).then(data => 
+  {
+    console.log("Location : " , data);
+    if(Object.keys(data).includes('lat')){
+      const loc = { lat: data['lat'], lng: data['lon'] };
+      const map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 15,
+        center: loc,
+      });
+      // The marker, positioned
+      const marker = new google.maps.Marker({
+        position: loc,
+        map: map,
+      });
+    }
+  });
+}
+
+let updateMap = setInterval(() => {
+  initMap();
+},1000*60*5); // Reload every 5 minutes

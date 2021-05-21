@@ -6,6 +6,13 @@
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
   <style>
     body { padding-top: 50px; }
+    /* Set the size of the div element that contains the map */
+    #map {
+      height: 400px;
+      /* The height is 400 pixels */
+      width: 100%;
+      /* The width is the width of the web page */
+    }
   </style>
 </head>
 <body>
@@ -18,9 +25,15 @@
 
       </div>
     </div>
+    <h1>Location of the weather station</h1>
+    <div id="map"></div>
   </div>
 
 </body>
 </html>
 
+<script
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDO8V10DOJyiDJjR6aqGvhEwdUotkUotKw&callback=initMap&libraries=&v=weekly"
+      async
+></script>
 <script src="app.js"></script>

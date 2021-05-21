@@ -10,6 +10,7 @@ app.use(cors());
 const port = 3000;
 
 let argonValues = {};
+let currentLocation = {};
 
 app.get('/', function(req, res) {
   res.sendFile(path.join(__dirname, '/public/index.html'));
@@ -19,10 +20,19 @@ app.get('/argonValues', (req,res) => {
   res.send(argonValues);
 });
 
+app.get('/argonLocation', (req,res) => {
+  res.send(currentLocation);
+});
+
 app.post('/json', (req, res) => {
   console.log("received req " , req.body);
   argonValues = { ...argonValues, ...req.body };
   res.send(req.body);
+});
+
+app.post('/location', (req, res) => {
+  console.log("received new location" , req.body);
+  currentLocation = {...req.body};
 });
 
 app.listen(port, () => {
