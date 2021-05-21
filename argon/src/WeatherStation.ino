@@ -21,6 +21,10 @@ String kv(String a, String b)
 // 	if(keyValues.length() % 2 != 0){
 // 		return String("");
 // 	}
+// 	String s("{");
+// 	for(int i = 0; i < keyValues.length(); i += 2){
+// 		s += "\""
+// 	}
 // }
 
 void setup()
@@ -84,6 +88,7 @@ void sendToServer(String body){
 		// Serial.println("**********************************!");
 		// Serial.println("New POST Connection!");
 		// Serial.println("Connection OK!");
+		//String body = kv("termo", String(termo));
 		// Send our HTTP data!
 		client.println("POST /json HTTP/1.0");
 		client.println("Host: 192.168.0.103:3000");
