@@ -7,6 +7,7 @@
         "vector": "cpp",
         "xstring": "cpp",
         "xutility": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "xlocale": "cpp"
     }
 }

@@ -1,9 +1,13 @@
+// BELJ2434 - FONH3001
+
 #include <math.h>
 #include "../lib/google-maps-device-locator/src/google-maps-device-locator.h"
 #include "../lib/JsonParserGeneratorRK/src/JsonParserGeneratorRK.h"
 
 const int LightPin = A0;
-
+const int PluviometrePin = A5;
+const int AnemometreVitessePin = A3;
+const int AnemometreDirectionPin = A2;
 GoogleMapsDeviceLocator locator;
 TCPClient client;										// Create TCP Client object
 byte server[] = {192, 168, 0, 103}; // http://maker-io-iot.atwebpages.com/
@@ -26,7 +30,6 @@ void locationCallback(float lat, float lon, float acc)
 	}
 	String jsonObj(jw.getBuffer());
 	sendToServer("/location",jsonObj);
-	return;
 }
 
 void getTwosComplement(int32_t *raw, uint8_t length)
@@ -44,21 +47,58 @@ void setup()
 	// Google map locator API
 	//locator.withSubscribe(locationCallback).withLocateOnce();
 	pinMode(LightPin,INPUT);
+	pinMode(AnemometreVitessePin,INPUT);
+	pinMode(AnemometreDirectionPin,INPUT);
+	pinMode(PluviometrePin,INPUT);
 }
 
 void loop()
 {
 	//testLightSensor();
+	//delay(2000);
+	testAnemometre();
+	delay(1000);
+	//testPluviometre();
+	//delay(2000);
 	//TestBarometre();
 	// Google map locator API
 	//locator.loop();
-	delay(3000);
+}
+
+void testAnemometre()
+{
+	int32_t vitesse = analogRead(AnemometreVitessePin);
+	int32_t direction = analogRead(AnemometreDirectionPin);
+	Serial.print("Vitesse : ");
+	Serial.println(vitesse);
+	Serial.print("Direction : ");
+	Serial.println(direction);
+	// JsonWriterStatic<254> jw;
+	// {
+	// 	JsonWriterAutoObject obj(&jw);
+	// 	jw.insertKeyValue("Anemometre vitesse", vitesse);
+	// 	jw.insertKeyValue("Anemometre direction", direction);
+	// }
+	// String jsonObj(jw.getBuffer());
+	// sendToServer("/json",jsonObj);
+}
+
+void testPluviometre()
+{
+	int32_t pluviometre = analogRead(PluviometrePin);
+	// JsonWriterStatic<124> jw;
+	// {
+	// 	JsonWriterAutoObject obj(&jw);
+	// 	jw.insertKeyValue("Pluviometre sensor", pluviometre);
+	// }
+	// String jsonObj(jw.getBuffer());
+	// sendToServer("/json",jsonObj);
 }
 
 void testLightSensor()
 {
 	int32_t result = analogRead(LightPin);
-	JsonWriterStatic<256> jw;
+	JsonWriterStatic<124> jw;
 	{
 		JsonWriterAutoObject obj(&jw);
 		jw.insertKeyValue("Light sensor", result);
