@@ -27,9 +27,8 @@ app.get('/argonLocation', (req,res) => {
 });
 
 app.post('/json', (req, res) => {
-  console.log("received req " , req.body);
+  console.log("received POST request from argon" , req.body);
   argonValues = { ...argonValues, ...req.body };
-  res.send(req.body);
 });
 
 app.post('/location', (req, res) => {

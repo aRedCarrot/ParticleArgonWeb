@@ -1,5 +1,4 @@
 // BELJ2434 - FONH3001
-
 #include <math.h>
 #include "../lib/google-maps-device-locator/src/google-maps-device-locator.h"
 #include "../lib/JsonParserGeneratorRK/src/JsonParserGeneratorRK.h"
@@ -8,6 +7,8 @@ const int LightPin = A0;
 const int PluviometrePin = A5;
 const int AnemometreVitessePin = A3;
 const int AnemometreDirectionPin = A2;
+const int TempHumidityPin_1 = D2;
+ const int TempHumidityPin_2 = D3;
 GoogleMapsDeviceLocator locator;
 TCPClient client;										// Create TCP Client object
 byte server[] = {192, 168, 0, 103}; // http://maker-io-iot.atwebpages.com/
@@ -40,6 +41,12 @@ void getTwosComplement(int32_t *raw, uint8_t length)
     }
 }
 
+// template<typename T>
+// void printL(String a, T b){
+// 	Serial.print(a);
+// 	Serial.println(b);
+// }
+
 void setup()
 {
 	Serial.begin(9600);
@@ -58,9 +65,12 @@ void loop()
 	//delay(1000);
 	//testAnemometre();
 	//delay(1000);
-	testPluviometre();
-	delay(1000);
+	//testPluviometre();
+	//delay(1000);
 	//TestBarometre();
+	//delay(1000);
+	testTemperatureAndHumidity();
+	delay(2500);
 	// Google map locator API
 	//locator.loop();
 }
@@ -143,6 +153,57 @@ void testLightSensor()
 	}
 	String jsonObj(jw.getBuffer());
 	sendToServer("/json",jsonObj);
+}
+
+
+
+void testTemperatureAndHumidity()
+{
+	pinMode(TempHumidityPin_1,OUTPUT);
+	digitalWrite(TempHumidityPin_1,1);
+	delay(12);
+	digitalWrite(TempHumidityPin_1,0);
+	delay(12);
+	pinMode(TempHumidityPin_1,INPUT);
+	byte data[40] = {0};
+	for(int i = 0; i < 40; i++){
+		data[i] = digitalRead(TempHumidityPin_1);
+		delay(4/40);
+	}
+	char integralRHData;
+	char decimalRHData;
+	char integralTData;
+	char decimalTData;
+	char checksum;
+	memcpy(&integralRHData,&data[0],sizeof(char));
+	memcpy(&decimalRHData,&data[8],sizeof(char));
+	memcpy(&integralTData,&data[16],sizeof(char));
+	memcpy(&decimalTData,&data[24],sizeof(char));
+	memcpy(&checksum,&data[32],sizeof(char));
+
+	Serial.print("Bytes : ");
+	for(int i = 0; i < 40; i++)
+	{
+			if(i % 8 == 0){
+				Serial.print(" ");
+			}
+			Serial.print(data[i]);
+	}
+	Serial.println(" ");
+	Serial.printlnf("integralRHData : %s",integralRHData);
+	Serial.printlnf("decimalRHData : %s",decimalRHData);
+	Serial.printlnf("integralTData : %s",integralTData);
+	Serial.printlnf("decimalTData : %s",decimalTData);
+	Serial.printlnf("checksum : %s",checksum);
+
+	int* checkSumValue = new int((int)integralRHData + (int)decimalRHData + (int)integralTData + (int)decimalTData);
+	char checkSumValidate;
+	memcpy(&checkSumValidate,&checkSumValue[24],sizeof(char));
+	if(checkSumValidate == checksum){
+		Serial.println("Check sum good");
+	} else {
+		Serial.println("Check sum bad");
+	}
 }
 
 int8_t readByte(uint8_t slaveDevice ,uint8_t regAddress)
