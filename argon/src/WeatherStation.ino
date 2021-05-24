@@ -108,16 +108,29 @@ void testAnemometre()
 
 void testPluviometre()
 {
-	int32_t pluviometre = analogRead(PluviometrePin);
-	Serial.print("Pluviometre : ");
-	Serial.println(pluviometre);
-	// JsonWriterStatic<124> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Pluviometre sensor", pluviometre);
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
+	bool previouslyOn = true;
+	int impulse = 0;
+	float pluie;
+	for(int i = 0; i < 10; i++)
+	{
+		pluie = analogRead(PluviometrePin);
+		if(pluie > 1000 && !previouslyOn){
+			impulse ++;
+			previouslyOn = true;
+		}
+		if(pluie < 1000 && previouslyOn){
+			previouslyOn = false;
+		}
+		delay(100);
+	}
+	pluie = 0.2794 * impulse;
+	JsonWriterStatic<124> jw;
+	{
+		JsonWriterAutoObject obj(&jw);
+		jw.insertKeyValue("Pluie ", String(pluie) + String(" mm/s"));
+	}
+	String jsonObj(jw.getBuffer());
+	sendToServer("/json",jsonObj);
 }
 
 void testLightSensor()
