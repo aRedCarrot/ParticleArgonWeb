@@ -55,11 +55,11 @@ void setup()
 void loop()
 {
 	//testLightSensor();
-	//delay(2000);
-	testAnemometre();
+	//delay(1000);
+	//testAnemometre();
+	//delay(1000);
+	testPluviometre();
 	delay(1000);
-	//testPluviometre();
-	//delay(2000);
 	//TestBarometre();
 	// Google map locator API
 	//locator.loop();
@@ -67,25 +67,50 @@ void loop()
 
 void testAnemometre()
 {
-	int32_t vitesse = analogRead(AnemometreVitessePin);
+	// Test vitesse
+	bool previouslyOn = false;
+	int32_t speed = 0;
+	int impulse = 0;
+	for(int i = 0; i < 1000; i++)
+	{
+		speed = analogRead(AnemometreVitessePin);
+		if(speed > 1000 && !previouslyOn){
+			impulse ++;
+			previouslyOn = true;
+		}
+		if(speed < 1000 && previouslyOn){
+			previouslyOn = false;
+		}
+		delay(1);
+	}
+	speed = 2.4 * impulse;
 	int32_t direction = analogRead(AnemometreDirectionPin);
-	Serial.print("Vitesse : ");
-	Serial.println(vitesse);
-	Serial.print("Direction : ");
-	Serial.println(direction);
-	// JsonWriterStatic<254> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Anemometre vitesse", vitesse);
-	// 	jw.insertKeyValue("Anemometre direction", direction);
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
+	float voltageChart[16] = {3.84,1.98,2.25,0.41,0.45,0.32,0.90,0.62,1.40,1.19,3.08,2.93,4.62,4.04,4.33,3.43};
+	const float angleChart[16] = {0,22.5,45,67.5,90,112.5,135,157.5,180,202.5,225,247.5,270,292.5,315,337.5};
+	for(int i = 0; i < 16;i++){
+			voltageChart[i] = voltageChart[i] * (4096.0/5.0);
+	}
+	float angle = -1;
+	for(int i = 0; i < 16;i++){
+		if((direction > voltageChart[i] - 50) && (direction < voltageChart[i] + 50)){
+			angle = angleChart[i];
+		}
+	}
+	JsonWriterStatic<254> jw;
+	{
+		JsonWriterAutoObject obj(&jw);
+		jw.insertKeyValue("Vitesse anemometre", String(speed) + String(" Km/h"));
+		jw.insertKeyValue("Angle anemometre", String(angle) + String("°"));
+	}
+	String jsonObj(jw.getBuffer());
+	sendToServer("/json",jsonObj);
 }
 
 void testPluviometre()
 {
 	int32_t pluviometre = analogRead(PluviometrePin);
+	Serial.print("Pluviometre : ");
+	Serial.println(pluviometre);
 	// JsonWriterStatic<124> jw;
 	// {
 	// 	JsonWriterAutoObject obj(&jw);
@@ -101,7 +126,7 @@ void testLightSensor()
 	JsonWriterStatic<124> jw;
 	{
 		JsonWriterAutoObject obj(&jw);
-		jw.insertKeyValue("Light sensor", result);
+		jw.insertKeyValue("Lumiere", result);
 	}
 	String jsonObj(jw.getBuffer());
 	sendToServer("/json",jsonObj);
