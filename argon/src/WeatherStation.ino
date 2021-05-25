@@ -53,10 +53,10 @@ void setup()
 	Wire.begin();
 	// Google map locator API
 	//locator.withSubscribe(locationCallback).withLocateOnce();
-	pinMode(LightPin,INPUT);
-	pinMode(AnemometreVitessePin,INPUT);
-	pinMode(AnemometreDirectionPin,INPUT);
-	pinMode(PluviometrePin,INPUT);
+	// pinMode(LightPin,INPUT);
+	// pinMode(AnemometreVitessePin,INPUT);
+	// pinMode(AnemometreDirectionPin,INPUT);
+	// pinMode(PluviometrePin,INPUT);
 }
 
 void loop()
@@ -67,12 +67,13 @@ void loop()
 	//delay(1000);
 	//testPluviometre();
 	//delay(1000);
-	//TestBarometre();
+	TestBarometre();
 	//delay(1000);
-	testTemperatureAndHumidity();
+	//testTemperatureAndHumidity();
 	delay(2500);
 	// Google map locator API
 	//locator.loop();
+	//Serial.println("1");
 }
 
 void testAnemometre()
@@ -211,6 +212,7 @@ int8_t readByte(uint8_t slaveDevice ,uint8_t regAddress)
     Wire.beginTransmission(slaveDevice);
     Wire.write(regAddress);
     Wire.endTransmission(false);
+	Wire.requestFrom(slaveDevice,1);
     //request 1 byte from slave
     return Wire.read(); //return this byte on success
 }
@@ -219,8 +221,8 @@ void writeByte(uint8_t slaveDevice ,uint8_t regAddress, uint8_t value)
 {
     Wire.beginTransmission(slaveDevice);
     Wire.write(regAddress);
-		Wire.write(value);
-    Wire.endTransmission(false);
+	Wire.write(value);
+    Wire.endTransmission();
 }
 
 void TestBarometre()
@@ -228,12 +230,22 @@ void TestBarometre()
 	Serial.println("Testing barometre");
 	uint8_t slave = 0x77;
 	uint8_t reg_temp[3]; // Registre temporaraire pour store nos valeurs
-
-	writeByte(slave,0x0C,0x89);
+	int32_t id = readByte(slave,0x0D);
+	Serial.print("id:");
+	Serial.println(id);
+	// writeByte(slave,0x0C,0x89);
 
 	// Compensated value
+	int32_t c0_0 = readByte(slave,0x10);
+	int32_t c0_1 = readByte(slave,0x11); // contains half of c1
+	int32_t c1_0 = readByte(slave,0x12);
+	int32_t c0 = ((c0_0 << 8) | (c0_1 & 0b11110000)) >> 4;
+	int32_t c1 = (c0_1 & 0b00001111) | c1_0;
+	getTwosComplement(&c0,12);
+	getTwosComplement(&c1,12);
+
+
 	int32_t c00_0 = readByte(slave,0x13);
-	Serial.print(c00_0);
 	int32_t c00_1 = readByte(slave,0x14);;
 	int32_t c00_2 = readByte(slave,0x15); // Contains half of C00 and C10 [4:4]
 	int32_t c00 = ((c00_0 << 16) | (c00_1 << 8) | (c00_2 & 0b11110000)) >> 4;
@@ -280,28 +292,42 @@ void TestBarometre()
 	// Begin loop
 	writeByte(slave,0x08,0x02);
 
-	// Temperature
+	// // Temperature
 	reg_temp[0] = readByte(slave,0x03);
 	reg_temp[1] = readByte(slave,0x04);
 	reg_temp[2] = readByte(slave,0x05);
-	int32_t rawTemp = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[0];
-	getTwosComplement(&rawTemp,24);
+	// Serial.print("Raw temp[0] : ");
+	// Serial.println(reg_temp[0]);
 
+	// Serial.print("Raw temp[1] : ");
+	// Serial.println(reg_temp[1]);
+
+	// Serial.print("Raw temp[2] : ");
+	// Serial.println(reg_temp[2]);
+
+	//int32_t rawTemp = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[2];
+	int32_t rawTemp = reg_temp[2] + (reg_temp[1] * 256) + (reg_temp[0] * 256 * 256);
+	getTwosComplement(&rawTemp,24);
 	writeByte(slave,0x08,0x01);
+	rawTemp = (c0 * 0.5) + (c1*rawTemp);
+	Serial.print("Raw temp : ");
+	Serial.println(rawTemp);
 
 	// Pressure
 	reg_temp[0] = readByte(slave,0x00);
 	reg_temp[1] = readByte(slave,0x01);
 	reg_temp[2] = readByte(slave,0x02);
-	int32_t rawPressure = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[0];
+	int32_t rawPressure = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[2];
 	getTwosComplement(&rawPressure,24);
-
+	// Serial.print("Raw bar : ");
+	// Serial.println(rawPressure);
 
 	float tempRaw_sc = rawTemp / (float)kTFactor;
+	Serial.println(tempRaw_sc);
 	float rawPressure_sc = rawPressure / (float)kPFactor;
 	float realPressure = c00 + rawPressure_sc*(c10 + rawPressure_sc *(c20+ rawPressure_sc *c30)) + tempRaw_sc *c01 + tempRaw_sc *rawPressure_sc *(c11+rawPressure_sc*c21);
-	Serial.print("Barometre : ");
-	Serial.println(rawPressure);
+	//Serial.print("Barometre : ");
+	//Serial.println(rawPressure);
 }
 
 String getFromServer()
