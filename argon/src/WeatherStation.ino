@@ -1,4 +1,5 @@
 // BELJ2434 - FONH3001
+// SYSTEM_MODE(MANUAL);
 #include <math.h>
 #include "../lib/google-maps-device-locator/src/google-maps-device-locator.h"
 #include "../lib/JsonParserGeneratorRK/src/JsonParserGeneratorRK.h"
@@ -22,11 +23,14 @@ const int AnemometreDirectionPin = A2;
 const int TempHumidityPin_1 = D2;
 //const int TempHumidityPin_2 = D3;
 GoogleMapsDeviceLocator locator;
+bool locationPosted = false;
 TCPClient client;										// Create TCP Client object
 byte server[] = {192, 168, 0, 103}; // http://maker-io-iot.atwebpages.com/
 byte dataBuffer[1024];
 
 String receivedData;
+
+time_t lastTimePosted = 0;
 
 // Barometre values
 int kTFactor = 7864320;
@@ -40,18 +44,10 @@ void locationCallback(float lat, float lon, float acc)
 	// - Latitude
 	// - Longitude
 	// - Accuracy of estimated location (in meters)
-	// JsonWriterStatic<256> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("lat", lat);
-	// 	jw.insertKeyValue("lon", lon);
-	// 	jw.insertKeyValue("acc", acc);
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/location",jsonObj);
 	_lat = lat;
 	_lon = lon;
 	_acc = acc;
+	locationPosted = true;
 }
 
 void getTwosComplement(int32_t *raw, uint8_t length)
@@ -86,12 +82,14 @@ void setup()
 {
 	Serial.begin(9600);
 	Wire.begin();
+	lastTimePosted = Time.now();
 	// Google map locator API
-	//locator.withSubscribe(locationCallback).withLocateOnce();
-	// pinMode(LightPin,INPUT);
-	// pinMode(AnemometreVitessePin,INPUT);
-	// pinMode(AnemometreDirectionPin,INPUT);
-	// pinMode(PluviometrePin,INPUT);
+	locator.withSubscribe(locationCallback).withLocateOnce();
+	pinMode(LightPin,INPUT);
+	pinMode(AnemometreVitessePin,INPUT);
+	pinMode(AnemometreDirectionPin,INPUT);
+	pinMode(PluviometrePin,INPUT);
+
 	// Wait for values to be ready
 	bool coefReady = false;
 	bool sensorReady = false;
@@ -147,25 +145,31 @@ void setup()
 	// Serial.printlnf(" c20 : %d",(int)c20);
 	// Serial.printlnf(" c21 : %d",(int)c21);
 	// Serial.printlnf(" c30 : %d",(int)c30);
-	// delay(5000);
 }
 
 void loop()
 {
-	//testLightSensor();
-	//delay(1000);
-	//testAnemometre();
-	//delay(1000);
-	//testPluviometre();
-	//delay(1000);
+	testLightSensor();
+	delay(250);
+	testAnemometre();
+	delay(250);
+	testPluviometre();
+	delay(250);
 	TestBarometre();
-	//delay(1000);
-	//testTemperatureAndHumidity();
-	delay(1000);
-	// Google map locator API
-	//locator.loop();
-	//Serial.println("1");
-	//connectAndSendAllToServer();
+	delay(250);
+	testTemperatureAndHumidity();
+	time_t now = Time.now();
+	if(!locationPosted){
+		// Google map locator API
+		locator.loop();
+	} else {
+		if(now - lastTimePosted > 5){
+			WiFi.connect();
+			while(!WiFi.ready()){delay(100);}
+			connectAndSendAllToServer();
+			WiFi.disconnect();
+		}
+	}
 }
 
 void testAnemometre()
@@ -199,14 +203,6 @@ void testAnemometre()
 			angle = angleChart[i];
 		}
 	}
-	// JsonWriterStatic<254> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Vitesse anemometre", String(speed) + String(" Km/h"));
-	// 	jw.insertKeyValue("Angle anemometre", String(angle) + String("°"));
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
 	_speed = speed;
 	_angle = angle;
 }
@@ -229,26 +225,12 @@ void testPluviometre()
 		delay(100);
 	}
 	pluie = 0.2794 * impulse;
-	// JsonWriterStatic<124> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Pluie ", String(pluie) + String(" mm/s"));
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
 	_pluie = pluie;
 }
 
 void testLightSensor()
 {
 	int result = analogRead(LightPin);
-	// JsonWriterStatic<124> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Lumiere", result);
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
 	_lumiere = result;
 }
 
@@ -265,7 +247,7 @@ void testTemperatureAndHumidity()
 	delay(20);
 	digitalWrite(TempHumidityPin_1, HIGH);
 	delayMicroseconds(40);
-	pinMode(TempHumidityPin_1, INPUT);
+	pinMode(TempHumidityPin_1, INPUT_PULLUP);
 	pulseIn(TempHumidityPin_1,HIGH);
 	for(int i = 0; i < 40; i++){
 		data[i] = pulseIn(TempHumidityPin_1,HIGH);
@@ -291,17 +273,8 @@ void testTemperatureAndHumidity()
 	int tempInteger = bytes[2];
 	int tempDecimal = bytes[3];
 
-	Serial.printf("Temp : %d",humidityInteger);
-	Serial.printlnf("Humid : %d",tempInteger);
-	// JsonWriterStatic<124> jw;
-	// {
-	// 	JsonWriterAutoObject obj(&jw);
-	// 	jw.insertKeyValue("Humidite", humidityInteger);
-	// 	jw.insertKeyValue("TempInteger", tempInteger);
-	// 	jw.insertKeyValue("TempDecimal", tempDecimal);
-	// }
-	// String jsonObj(jw.getBuffer());
-	// sendToServer("/json",jsonObj);
+	Serial.printf("Temp : %d",tempInteger);
+	Serial.printlnf("Humid : %d",humidityInteger);
 	_humid = humidityInteger;
 	_tempInt = tempInteger;
 	_tempDec = tempDecimal;
