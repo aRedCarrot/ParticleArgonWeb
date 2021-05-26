@@ -3,17 +3,17 @@
 #include "../lib/google-maps-device-locator/src/google-maps-device-locator.h"
 #include "../lib/JsonParserGeneratorRK/src/JsonParserGeneratorRK.h"
 // JSON DATA
-float _lat = 0;
-float _lon = 0;
-float _acc = 0;
-int _speed = 0;
-float _angle = 0;
-float _pluie = 0;
-int _lumiere = 0;
-int _humid = 0;
-int _tempInt = 0;
-int _tempDec = 0;
-int _pression = 0;
+float _lat = 0; // float
+float _lon = 0; // float
+float _acc = 0; // float
+int _speed = 0; // Km/h
+float _angle = 0; // Degree
+float _pluie = 0; // mm/s
+int _lumiere = 0; // Lux
+int _humid = 0; // Pourcentage
+int _tempInt = 0; // Nombre
+int _tempDec = 0; // Nombre
+int _pression = 0; // Kilo pascal
 
 const int LightPin = A0;
 const int PluviometrePin = A5;
@@ -29,9 +29,9 @@ byte dataBuffer[1024];
 String receivedData;
 
 // Barometre values
-int kTFactor = 524288; // 16 times
-int kPFactor = 7864320; // 16 times
-int c0,c1,c00,c10,c01,c11,c20,c21,c30 = {0};
+int kTFactor = 7864320;
+int kPFactor = 7864320;
+int32_t c0,c1,c00,c10,c01,c11,c20,c21,c30 = {0};
 uint8_t slave = 0x77;
 
 void locationCallback(float lat, float lon, float acc)
@@ -54,12 +54,32 @@ void locationCallback(float lat, float lon, float acc)
 	_acc = acc;
 }
 
-void getTwosComplement(int *raw, uint8_t length)
+void getTwosComplement(int32_t *raw, uint8_t length)
 {
-    if (*raw & ((uint)1 << (length - 1)))
+    if (*raw & ((uint32_t)1 << (length - 1)))
     {
-        *raw -= (uint)1 << length;
+        *raw -= (uint32_t)1 << length;
     }
+}
+
+uint8_t readByte(uint8_t slaveDevice ,uint8_t regAddress)
+{
+    Wire.beginTransmission(slaveDevice);
+    Wire.write(regAddress);
+    Wire.endTransmission(false);
+		Wire.requestFrom(slaveDevice,1);
+    //request 1 byte from slave
+    return Wire.read(); //return this byte on success
+}
+
+void writeByte(uint8_t slaveDevice ,uint8_t regAddress, uint8_t value, uint8_t mask = 0xFF)
+{
+		int16_t old = readByte(slaveDevice,regAddress);
+		uint8_t newData = ((uint8_t)old & ~mask) | (value & mask);
+    Wire.beginTransmission(slaveDevice);
+    Wire.write(regAddress);
+		Wire.write(newData);
+    Wire.endTransmission();
 }
 
 void setup()
@@ -72,14 +92,11 @@ void setup()
 	// pinMode(AnemometreVitessePin,INPUT);
 	// pinMode(AnemometreDirectionPin,INPUT);
 	// pinMode(PluviometrePin,INPUT);
-
-	writeByte(slave,0x06,0x03); // Set pressure config
-	writeByte(slave,0x07,0x80); // Set temp config
 	// Wait for values to be ready
 	bool coefReady = false;
 	bool sensorReady = false;
 	while(!coefReady || !sensorReady){
-		int8_t flags = readByte(slave,0x08);
+		uint8_t flags = readByte(slave,0x08);
 		if(((flags & 0x80) >> 7) == 1){
 			coefReady = true;
 		}
@@ -89,51 +106,38 @@ void setup()
 		delay(100);
 	}
 	// Compensated value
-	int c0_0 = readByte(slave,0x10);
-	int c0_1 = readByte(slave,0x11); // contains half of c1
-	int c1_0 = readByte(slave,0x12);
-	c0 = ((c0_0 << 8) | (c0_1 & 0b11110000)) >> 4;
-	c1 = ((c0_1 & 0b00001111) << 8) | c1_0;
+	c0 = (readByte(slave,0x10) << 4) | ((readByte(slave,0x11) & 0xF0) >> 4);
+	c1 = ((readByte(slave,0x11) & 0x0F) << 8 ) | (readByte(slave,0x12));
 	getTwosComplement(&c0,12);
 	getTwosComplement(&c1,12);
 
-	int c00_0 = readByte(slave,0x13);
-	int c00_1 = readByte(slave,0x14);
-	int c00_2 = readByte(slave,0x15); // Contains half of C00 and C10 [4:4]
-	c00 = ((c00_0 << 16) | (c00_1 << 8) | (c00_2 & 0b11110000)) >> 4;
+	c00 = ((readByte(slave,0x13) << 16) | (readByte(slave,0x14) << 8) | (readByte(slave,0x15) & 0b11110000)) >> 4;
 	getTwosComplement(&c00,20);
 
-	int c10_0 = (c00_2 & 0b00001111);
-	int c10_1 = readByte(slave,0x16);
-	int c10_2 = readByte(slave,0x17);
-	c10 = (c10_0 << 16) | (c10_1 << 8) | (c10_2 & 0b11110000);
+	c10 = ((readByte(slave,0x15) & 0b00001111 ) << 16) | (readByte(slave,0x16) << 8) | (readByte(slave,0x17) & 0b11110000);
 	getTwosComplement(&c10,20);
 	
-	int c01_0 = readByte(slave,0x18);
-	int c01_1 = readByte(slave,0x19);
-	c01 = (c01_0 << 8) | c01_1;
+	c01 = (readByte(slave,0x18)<< 8) | readByte(slave,0x19);
 	getTwosComplement(&c01,16);
 
-	int c11_0 = readByte(slave,0x1A);
-	int c11_1 = readByte(slave,0x1B);
-	c11 = (c11_0 << 8) | c11_1;
+	c11 = (readByte(slave,0x1A) << 8) | readByte(slave,0x1B);
 	getTwosComplement(&c11,16);
 
-	int c20_0 = readByte(slave,0x1C);
-	int c20_1 = readByte(slave,0x1D);
-	c20 = (c20_0 << 8) | c20_1;
+	c20 = (readByte(slave,0x1C) << 8) | readByte(slave,0x1D);
 	getTwosComplement(&c20,16);
 
-	int c21_0 = readByte(slave,0x1E);
-	int c21_1 = readByte(slave,0x1F);
-	c21 = (c21_0 << 8) | c21_1;
+	c21 = (readByte(slave,0x1E) << 8) | readByte(slave,0x1F);
 	getTwosComplement(&c21,16);
 
-	int c30_0 = readByte(slave,0x20);
-	int c30_1 = readByte(slave,0x21);
-	c30 = (c30_0 << 8) | c30_1;
+	c30 = (readByte(slave,0x20) << 8) | readByte(slave,0x21);
 	getTwosComplement(&c30,16);
 
+	// Setup all registers for I2C pressure
+	writeByte(slave,0x07, 0x20, 0x70);  // Set pressure config
+	writeByte(slave,0x07, 0x03, 0x07);
+	writeByte(slave,0x06, 0x20, 0x70);  // Set temp config
+	writeByte(slave,0x06, 0x03, 0x07);
+	delay(50);
 	// Serial.printlnf(" c0 : %d",(int)c0);
 	// Serial.printlnf(" c1 : %d",(int)c1);
 	// Serial.printlnf(" c00 : %d",(int)c00);
@@ -143,7 +147,7 @@ void setup()
 	// Serial.printlnf(" c20 : %d",(int)c20);
 	// Serial.printlnf(" c21 : %d",(int)c21);
 	// Serial.printlnf(" c30 : %d",(int)c30);
-	delay(5000);
+	// delay(5000);
 }
 
 void loop()
@@ -154,9 +158,9 @@ void loop()
 	//delay(1000);
 	//testPluviometre();
 	//delay(1000);
-	//TestBarometre();
+	TestBarometre();
 	//delay(1000);
-	testTemperatureAndHumidity();
+	//testTemperatureAndHumidity();
 	delay(1000);
 	// Google map locator API
 	//locator.loop();
@@ -308,14 +312,14 @@ void connectAndSendAllToServer()
 	JsonWriterStatic<512> jw;
 	{
 		JsonWriterAutoObject obj(&jw);
-		jw.insertKeyValue("Vitesse anemometre", String(_speed) + String(" Km/h"));
-		jw.insertKeyValue("Angle anemometre", String(_angle) + String("°"));
-		jw.insertKeyValue("Pluie", String(_pluie) + String(" mm/s"));
-		jw.insertKeyValue("Lumiere",_lumiere);
-		jw.insertKeyValue("Humidite",_humid);
-		jw.insertKeyValue("TempInteger",_tempInt);
-		jw.insertKeyValue("TempDecimal",_tempDec);
-		jw.insertKeyValue("Pression",_pression);
+		jw.insertKeyValue("Vitesse anemometre(Km/h)", _speed);
+		jw.insertKeyValue("Angle anemometre(Degree)", _angle);
+		jw.insertKeyValue("Pluie(mm/s)",_pluie);
+		jw.insertKeyValue("Lumiere(Lux)",_lumiere);
+		jw.insertKeyValue("Humidite(%)",_humid);
+		jw.insertKeyValue("TempInteger(Capteur humid)",_tempInt);
+		jw.insertKeyValue("TempDecimal(Capteur humid)",_tempDec);
+		jw.insertKeyValue("Pression (KPascal)",_pression);
 	}
 	String jsonObj(jw.getBuffer());
 	sendToServer("/json",jsonObj);
@@ -331,24 +335,6 @@ void connectAndSendAllToServer()
 	sendToServer("/location",jsonObj2);
 }
 
-int8_t readByte(uint8_t slaveDevice ,uint8_t regAddress)
-{
-    Wire.beginTransmission(slaveDevice);
-    Wire.write(regAddress);
-    Wire.endTransmission(false);
-		Wire.requestFrom(slaveDevice,1);
-    //request 1 byte from slave
-    return Wire.read(); //return this byte on success
-}
-
-void writeByte(uint8_t slaveDevice ,uint8_t regAddress, uint8_t value)
-{
-    Wire.beginTransmission(slaveDevice);
-    Wire.write(regAddress);
-		Wire.write(value);
-    Wire.endTransmission();
-}
-
 void TestBarometre()
 {
 	uint8_t reg_temp[3]; // Registre temporaraire pour store nos valeurs
@@ -359,7 +345,7 @@ void TestBarometre()
 	// Wait for values to be ready
 	bool tmpReady = false;
 	while(!tmpReady){
-		int8_t flags = readByte(slave,0x08);
+		uint8_t flags = readByte(slave,0x08);
 		if(((flags & 0x20) >> 5) == 1){
 			tmpReady = true;
 		}
@@ -371,24 +357,25 @@ void TestBarometre()
 	reg_temp[1] = readByte(slave,0x04);
 	reg_temp[2] = readByte(slave,0x05);
 
-	//int rawTemp = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[2];
-	int rawTemp = reg_temp[2] + (reg_temp[1] * 256) + (reg_temp[0] * 256 * 256);
-	Serial.println(rawTemp);
+	int32_t rawTemp = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[2];
+	//int32_t rawTemp = reg_temp[2] + (reg_temp[1] * 256) + (reg_temp[0] * 256 * 256);
 	getTwosComplement(&rawTemp,24);
 	// Scale down
-	float scaledTemp = rawTemp / kTFactor;
-	rawTemp = scaledTemp;
-	// Compensate
-	scaledTemp = (c0 * 0.5) + (c1*scaledTemp);
-	Serial.print("Scaled temp : ");
-	Serial.println(scaledTemp);
+	float temp = rawTemp;
+  // Compensate
+  temp /= 7864320;
+  rawTemp = temp;
+	// Scale it
+  temp = ( c0 / 2.0 ) + c1 * temp;
+	Serial.print("Temperature celcius : ");
+	Serial.println(String(temp));
 
 	writeByte(slave,0x08,0x01); // Enable pressure measurement
 	delay(200);
 	// Wait for values to be ready
 	bool prsReady = false;
 	while(!prsReady){
-		int8_t flags = readByte(slave,0x08);
+		uint8_t flags = readByte(slave,0x08);
 		if(((flags & 0x10) >> 4) == 1){
 			prsReady = true;
 		}
@@ -398,14 +385,15 @@ void TestBarometre()
 	reg_temp[0] = readByte(slave,0x00);
 	reg_temp[1] = readByte(slave,0x01);
 	reg_temp[2] = readByte(slave,0x02);
-	int rawPressure = (reg_temp[0] << 16) | (reg_temp[1] << 8) | reg_temp[2];
+	int32_t rawPressure = (reg_temp[0] << 16) | (reg_temp[1] << 8) | (reg_temp[2]);
 	getTwosComplement(&rawPressure,24);
-	float rawPressure_sc = rawPressure / kPFactor;
+	float pression = rawPressure;
+	pression /= kPFactor;
 	
-	float realPressure = c00 + rawPressure_sc*(c10 + rawPressure_sc *(c20+ rawPressure_sc *c30)) + rawTemp *c01 + rawTemp *rawPressure_sc *(c11+rawPressure_sc*c21);
-	Serial.print("Barometre : ");
-	Serial.println(realPressure);
-	_pression = realPressure;
+	pression = c00 + pression * (c10 + pression * (c20 + pression * c30)) + rawTemp * (c01 + pression * (c11 + pression * c21));
+	Serial.print("Barometre (KiloPascal) : ");
+	Serial.println(String(pression/1000));
+	_pression = pression/1000;
 }
 
 String getFromServer()
