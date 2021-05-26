@@ -271,7 +271,10 @@ void testTemperatureAndHumidity()
 	for(int i = 0; i < 5; i++)
 	{
 		for(int j = 0; j < 8; j++){
-			bytes[i] = bytes[i] | ((data[i*8+j] > 50) << (7 - j));
+			bytes[i] <<= 1;
+			if(data[i*8+j] > 50){
+				bytes[i] |= 1;
+			}
 		}
 	}
 	if (bytes[4] != ((bytes[0] + bytes[1] + bytes[2] + bytes[3]) & 0xFF)) {
