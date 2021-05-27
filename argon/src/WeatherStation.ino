@@ -364,7 +364,7 @@ void TestBarometre()
 	// Scale down
 	float temp = rawTemp;
   // Compensate
-  temp /= 7864320;
+  temp /= kTFactor;
   rawTemp = temp;
 	// Scale it
   temp = ( c0 / 2.0 ) + c1 * temp;
